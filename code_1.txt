@@ -4,9 +4,7 @@
 4.	   private SpriteRenderer _spriteRenderer;
 5.	   private GrowthStage _currentGrowthStage;
 6.	   private Renderer _renderer;
-7.	   private BoxCollider _collider;
-8.	   private Dryness _dryness;
-9.	
+7.	
 10.	   private void Awake()
 11.	   {
 12.	      _spriteRenderer = GetComponent<SpriteRenderer>();
