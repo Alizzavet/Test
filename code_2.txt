@@ -1,0 +1,300 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
+using OpenTK;
+using OpenTK.Graphics;
+using OpenTK.Graphics.OpenGL;
+
+namespace BasketballAnimation
+{
+    public class Program : GameWindow
+    {
+        private Vector3 ballPosition = new Vector3(0, 6, 0);
+        private Vector3 basketPosition = new Vector3(0, 0, 0);
+        private Vector3 gravity = new Vector3(0, -0.01f, 0); // Гравитация
+        private Vector4 lightPosition = new Vector4(0, 10, -5, 1);
+
+        private bool ballInBasket = false;
+        private bool ballDropped = false;
+
+        private int basketballTextureId;
+        private int basketTextureId;
+        
+        private float lightAngle = 0.0f; // Угол вращения источника света
+
+        public Program() : base(800, 600, GraphicsMode.Default, "Basketball Animation")
+        {
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            GL.ClearColor(Color4.Black);
+
+            // Включение буфера глубины для правильного отображения глубины сцены
+            GL.Enable(EnableCap.DepthTest);
+
+            // Загрузка текстур
+            basketballTextureId = LoadTexture("F:\\8 семестр\\AKG\\pract7\\Pr7\\Pr7\\Properties\\ball.jpg");
+            basketTextureId = LoadTexture("F:\\8 семестр\\AKG\\pract7\\Pr7\\Pr7\\Properties\\wood.jpg");
+            // Включение освещения
+            GL.Enable(EnableCap.Lighting);
+            GL.Enable(EnableCap.Light0); // Включение источника света №0
+
+            // Настройка параметров источника света
+            GL.Light(LightName.Light0, LightParameter.Position, lightPosition);
+            GL.Light(LightName.Light0, LightParameter.Diffuse, Color.White);
+            GL.Light(LightName.Light0, LightParameter.Specular, Color.White);
+            GL.Light(LightName.Light0, LightParameter.Ambient, Color.Gray);
+
+            // Включение текстур
+            GL.Enable(EnableCap.Texture2D);
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            GL.Viewport(0, 0, Width, Height);
+            GL.MatrixMode(MatrixMode.Projection);
+            GL.LoadIdentity();
+            Matrix4 perspective =
+                Matrix4.CreatePerspectiveFieldOfView(MathHelper.PiOver4, Width / (float) Height, 1.0f, 100.0f);
+            GL.LoadMatrix(ref perspective);
+            GL.MatrixMode(MatrixMode.Modelview);
+        }
+
+        protected override void OnUpdateFrame(FrameEventArgs e)
+        {
+            base.OnUpdateFrame(e);
+            
+            // Увеличиваем угол вращения источника света каждый кадр
+            lightAngle += 0.03f;
+            if (lightAngle > MathHelper.TwoPi) // Если угол превысил 360 градусов, сбрасываем его
+                lightAngle -= MathHelper.TwoPi;
+
+            if (!ballInBasket && !ballDropped)
+            {
+                // Увеличение скорости падения мяча
+                gravity += new Vector3(0, -0.01f, 0); // Ускорение гравитации
+
+                // Падение мяча под воздействием ускоренной гравитации
+                ballPosition += gravity;
+
+                // Проверка на попадание мяча в корзину
+                if (Math.Abs(ballPosition.X - basketPosition.X) < 1 &&
+                    Math.Abs(ballPosition.Z - basketPosition.Z) < 1 && ballPosition.Y < basketPosition.Y)
+                {
+                    ballInBasket = true;
+                    // Остановка мяча
+                    gravity = Vector3.Zero;
+                }
+                // Проверка на достижение мячом земли
+                else if (ballPosition.Y < -4.0f)
+                {
+                    // Отскок мяча от земли с потерей некоторой части энергии
+                    ballPosition = new Vector3(ballPosition.X, -4.0f, ballPosition.Z); // Фиксируем мяч на уровне земли
+                    gravity = new Vector3(0, -gravity.Y * 0.8f,
+                        0); // Уменьшаем вертикальную составляющую скорости с потерей энергии
+                }
+                // Проверка на столкновение мяча с дном корзины
+                else if (ballPosition.Y < 0.5f && Math.Abs(ballPosition.X - basketPosition.X) < 1 &&
+                         Math.Abs(ballPosition.Z - basketPosition.Z) < 1)
+                {
+                    // Отскок мяча от дна корзины с потерей некоторой части энергии
+                    ballPosition =
+                        new Vector3(ballPosition.X, 0.5f, ballPosition.Z); // Фиксируем мяч на уровне дна корзины
+                    gravity = new Vector3(0, -gravity.Y * 0.8f,
+                        0); // Уменьшаем вертикальную составляющую скорости с потерей энергии
+                }
+            }
+        }
+
+        protected override void OnRenderFrame(FrameEventArgs e)
+        {
+            base.OnRenderFrame(e);
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+            
+            // Вращение источника света по окружности
+            lightPosition.X = (float)Math.Cos(lightAngle) * 5; // Радиус окружности = 5
+            lightPosition.Z = (float)Math.Sin(lightAngle) * 5; // Радиус окружности = 5
+            GL.Light(LightName.Light0, LightParameter.Position, lightPosition);
+
+            GL.LoadIdentity();
+            Matrix4 lookAtMatrix = Matrix4.LookAt(new Vector3(0, 5, 15), Vector3.Zero, Vector3.UnitY);
+            GL.LoadMatrix(ref lookAtMatrix);
+            
+            // Рисование мяча
+            GL.BindTexture(TextureTarget.Texture2D, basketballTextureId);
+            DrawBasketball();
+
+            // Рисование корзины
+            GL.BindTexture(TextureTarget.Texture2D, basketTextureId);
+            DrawBasket();
+
+            SwapBuffers();
+        }
+
+        private void DrawBasket()
+        {
+            GL.BindTexture(TextureTarget.Texture2D, basketTextureId);
+
+            // Рисование основания корзины
+            GL.Begin(PrimitiveType.TriangleFan);
+            GL.TexCoord2(0.5f, 0.5f); // Центральная точка основания
+            GL.Vertex3(0, 0, 0);
+            for (float angle = 0; angle <= Math.PI * 2 + (float)(Math.PI / 16); angle += (float)(Math.PI / 16))
+            {
+                float x = (float)Math.Cos(angle) * 1.5f;
+                float z = (float)Math.Sin(angle) * 1.5f;
+                GL.Normal3(0, 1, 0); // Нормаль направлена вверх для каждой вершины основания корзины
+                GL.TexCoord2((float)(Math.Cos(angle) * 0.5f) + 0.5f, (float)(Math.Sin(angle) * 0.5f) + 0.5f);
+                GL.Vertex3(x, 0, z);
+            }
+            GL.End();
+
+            // Рисование решетки корзины
+            GL.Begin(PrimitiveType.Lines);
+            for (int i = 0; i < 16; i++)
+            {
+                float x = (float)Math.Cos(i * Math.PI / 8) * 1.5f;
+                float z = (float)Math.Sin(i * Math.PI / 8) * 1.5f;
+                GL.Normal3(x, 0, z); // Нормаль направлена вдоль решетки
+                GL.Vertex3(x, 0, z);
+                GL.Vertex3(x * 1.5f, 3, z * 1.5f); // Увеличиваем радиус прутьев решетки
+            }
+            GL.End();
+
+            // Рисование обручей корзины
+            for (float y = 0.5f; y < 3.5; y += 0.5f)
+            {
+                GL.Begin(PrimitiveType.QuadStrip);
+                for (float angle = 0; angle <= Math.PI * 2 + (float)(Math.PI / 16); angle += (float)(Math.PI / 16))
+                {
+                    float radius = 1.5f + y * 0.3f; // Увеличиваем радиус обручей
+                    float x = (float)Math.Cos(angle) * radius; 
+                    float z = (float)Math.Sin(angle) * radius; 
+                    GL.Normal3((float)Math.Cos(angle), 0, (float)Math.Sin(angle)); // Нормаль направлена вдоль обруча
+                    GL.Vertex3(x, y, z);
+                    GL.Vertex3(x, y + 0.05f, z); // Увеличиваем высоту обруча на 0.5f
+                }
+                GL.End();
+            }
+        }
+
+
+        private void DrawBasketball()
+        {
+            GL.PushMatrix();
+            GL.Translate(ballPosition);
+            DrawSphere(0.5f, 10, 10); // Рисование мяча
+            GL.PopMatrix();
+        }
+
+        private void DrawSphere(float radius, int slices, int stacks)
+        {
+            GL.Begin(PrimitiveType.Quads);
+
+            for (int i = 0; i < slices; i++)
+            {
+                for (int j = 0; j < stacks; j++)
+                {
+                    double theta1 = (i * 2 * Math.PI) / slices;
+                    double theta2 = ((i + 1) * 2 * Math.PI) / slices;
+                    double phi1 = (j * Math.PI) / stacks;
+                    double phi2 = ((j + 1) * Math.PI) / stacks;
+
+                    // Вершины сферы
+                    Vector3 v1 = new Vector3(
+                        (float) (radius * Math.Sin(phi1) * Math.Cos(theta1)),
+                        (float) (radius * Math.Cos(phi1)),
+                        (float) (radius * Math.Sin(phi1) * Math.Sin(theta1))
+                    );
+
+                    Vector3 v2 = new Vector3(
+                        (float) (radius * Math.Sin(phi2) * Math.Cos(theta1)),
+                        (float) (radius * Math.Cos(phi2)),
+                        (float) (radius * Math.Sin(phi2) * Math.Sin(theta1))
+                    );
+
+                    Vector3 v3 = new Vector3(
+                        (float) (radius * Math.Sin(phi2) * Math.Cos(theta2)),
+                        (float) (radius * Math.Cos(phi2)),
+                        (float) (radius * Math.Sin(phi2) * Math.Sin(theta2))
+                    );
+
+                    Vector3 v4 = new Vector3(
+                        (float) (radius * Math.Sin(phi1) * Math.Cos(theta2)),
+                        (float) (radius * Math.Cos(phi1)),
+                        (float) (radius * Math.Sin(phi1) * Math.Sin(theta2))
+                    );
+
+                    // Первый треугольник
+                    GL.Normal3(Vector3.Normalize(v1));
+                    GL.TexCoord2((float) i / slices, (float) j / stacks);
+                    GL.Vertex3(v1);
+                    GL.Normal3(Vector3.Normalize(v2));
+                    GL.TexCoord2((float) i / slices, (float) (j + 1) / stacks);
+                    GL.Vertex3(v2);
+                    GL.Normal3(Vector3.Normalize(v3));
+                    GL.TexCoord2((float) (i + 1) / slices, (float) (j + 1) / stacks);
+                    GL.Vertex3(v3);
+                    GL.Normal3(Vector3.Normalize(v4));
+                    GL.TexCoord2((float) (i + 1) / slices, (float) j / stacks);
+                    GL.Vertex3(v4);
+
+                    // Второй треугольник
+                    GL.Normal3(Vector3.Normalize(v4));
+                    GL.TexCoord2((float) (i + 1) / slices, (float) j / stacks);
+                    GL.Vertex3(v4);
+                    GL.Normal3(Vector3.Normalize(v3));
+                    GL.TexCoord2((float) (i + 1) / slices, (float) (j + 1) / stacks);
+                    GL.Vertex3(v3);
+                    GL.Normal3(Vector3.Normalize(v2));
+                    GL.TexCoord2((float) i / slices, (float) (j + 1) / stacks);
+                    GL.Vertex3(v2);
+                    GL.Normal3(Vector3.Normalize(v1));
+                    GL.TexCoord2((float) i / slices, (float) j / stacks);
+                    GL.Vertex3(v1);
+                }
+            }
+
+            GL.End();
+        }
+
+        private int LoadTexture(string path)
+        {
+            int id = GL.GenTexture();
+            GL.BindTexture(TextureTarget.Texture2D, id);
+
+            using (Bitmap bitmap = new Bitmap(path))
+            {
+                bitmap.RotateFlip(RotateFlipType.RotateNoneFlipY);
+                BitmapData data = bitmap.LockBits(new Rectangle(0, 0, bitmap.Width, bitmap.Height),
+                    ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+                GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba,
+                    data.Width, data.Height, 0, OpenTK.Graphics.OpenGL.PixelFormat.Bgra,
+                    PixelType.UnsignedByte, data.Scan0);
+
+                bitmap.UnlockBits(data);
+            }
+
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter,
+                (int) TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter,
+                (int) TextureMagFilter.Linear);
+
+            return id;
+        }
+
+        [STAThread]
+        static void Main(string[] args)
+        {
+            using (Program game = new Program())
+            {
+                game.Run(30.0, 30.0);
+            }
+        }
+    }
+}
