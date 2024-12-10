@@ -1,90 +1,14 @@
-1.	public abstract class Plant : MonoBehaviour, IInteractable
-2.	{
-3.	   private PlantConfig _plantConfig;
-4.	   private SpriteRenderer _spriteRenderer;
-5.	   private GrowthStage _currentGrowthStage;
-6.	   private Renderer _renderer;
-7.	
-10.	   private void Awake()
-11.	   {
-12.	      _spriteRenderer = GetComponent<SpriteRenderer>();
-13.	      _renderer = GetComponent<Renderer>();
-14.	      _collider = GetComponent<BoxCollider>();
-15.	      _dryness = GetComponent<Dryness>();
-16.	   }
-17.	
-18.	   private void OnEnable()
-19.	   {
-20.	      DayNightCycle.NextDay += Grow;
-21.	   }
-22.	
-23.	   public void SetConfig(PlantConfig newConfig)
-24.	   {
-25.	      _plantConfig = newConfig;
-26.	      var seedling = _plantConfig;
-27.	      _spriteRenderer.sprite = seedling.Sprite;
-28.	      CheckCollider();
-29.	   }
-30.	
-31.	   public Renderer GetPlantRenderer()
-32.	   {
-33.	      return _renderer;
-34.	   }
-35.	
-36.	   private void Grow()
-37.	   {
-38.	      if (_currentGrowthStage == null)
-39.	      {
-40.	         _currentGrowthStage = new SeedlingStage();
-41.	         _spriteRenderer.sprite = _plantConfig.SeedlingStageConfig.Sprite;
-42.	      }
-43.	      else 
-44.	         _currentGrowthStage = _currentGrowthStage.Grow(_spriteRenderer, _plantConfig);
-45.	      
-46.	      if (Physics.Raycast(transform.position, Vector3.down, out var hit))
-47.	      {
-48.	         if (hit.collider.gameObject.CompareTag("Ground"))
-49.	         {
-50.	            var worldPos = hit.point;
-51.	            worldPos.y = hit.collider.bounds.max.y + _renderer.bounds.size.y / 2; 
-52.	            transform.position = worldPos;
-53.	            gameObject.transform.position = worldPos;
-54.	         }
-55.	      }
-56.	      
-57.	      CheckCollider();
-58.	   }
-59.	
-60.	   private void CheckCollider()
-61.	   {
-62.	      var sprite = _spriteRenderer.sprite;
-63.	      var size = _collider.size;
-64.	      size = sprite.bounds.size;
-65.	      var zSize = 2f; 
-66.	      size = new Vector3(size.x, size.y, zSize);
-67.	      _collider.size = size;
-68.	      _collider.center = sprite.bounds.center;
-69.	   }
-70.	   
-71.	   public abstract void Loot();
-72.	
-73.	   private void OnDisable()
-74.	   {
-75.	      DayNightCycle.NextDay -= Grow;
-76.	   }
-77.	
-78.	   public void Interact()
-79.	   {
-80.	      if (_dryness.PlantDry)
-81.	      {
-82.	         Debug.Log("тратим энергию на полив!");
-83.	         _dryness.Moisten();
-84.	      }
-85.	      else if(_currentGrowthStage is MatureStage && !_dryness.PlantDry)
-86.	      {
-87.	         var menu = PoolObject.Get<InteractMenu>(); 
-88.	         menu.Plant(_plantConfig, this); 
-89.	         menu.GetTransform(gameObject.transform);
-90.	      }
-91.	   }
-92.	} 
+using System;
+
+class Program
+{
+    static void Main()
+    {
+        Greet();
+    }
+
+    static void Greet()
+    {
+        Console.WriteLine("Hello from feature1!");
+    }
+}
